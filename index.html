@@ -96,6 +96,7 @@
             document.getElementById('pairing-overlay').style.display = 'flex';
             peer.on('open', (id) => {
                 new QRCode(document.getElementById("qrcode"), { 
+                    // FIXED: Reverted to the correct root URL that GitHub Pages is serving
                     text: `https://mattia137.github.io/controller_test/?id=${id}`, 
                     width: 200, height: 200, colorDark: "#000000", colorLight: "#ffffff" 
                 });
