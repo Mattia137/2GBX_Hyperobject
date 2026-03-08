@@ -124,15 +124,7 @@
                     let data;
                     try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
 
-                    if(data.force > 0) {
-                        targetDisplay.innerText = `RCVD_${data.type}`;
-                        targetDisplay.style.color = "#00ff00";
-                    } else if (data.force === 0 && data.type) {
-                        targetDisplay.innerText = "---";
-                        targetDisplay.style.color = "#ffffff";
-                    }
-
-                    if (data.type === 'MOVE') { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
+                    if (data.type === 'MOVE' { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     if (data.type === 'ROTATE') { remoteInput.rotate = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     // If a sub-project iframe is open, relay move/rotate for orbit
                     const projectOpen = container.style.display !== 'none';
@@ -244,7 +236,7 @@
                 document.getElementById("coord-val").innerText = `${camera.position.x.toFixed(2)} // ${camera.position.z.toFixed(2)}`;
                 
                 // Remote: raycast screen center to update HUD target display
-                if (window._remoteMode && container.style.display === 'none') {
+                if (window._remoteMode) {
                     const cx = engine.getRenderWidth() / 2;
                     const cy = engine.getRenderHeight() / 2;
                     cursorRing.style.left = cx + 'px';
