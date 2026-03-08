@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>HYPEROBJECT_environment</title>
     <link href="https://fonts.googleapis.com/css2?family=Fragment+Mono&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Fragment Mono', monospace; }
@@ -92,12 +92,10 @@
         }
 
         function initRemoteSystem() {
-            // TURN SERVER ADDED: Forces connection through school firewalls
             const peer = new Peer({
                 config: {
                     'iceServers': [
                         { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' },
                         { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
                         { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
                         { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
@@ -163,7 +161,6 @@
             initialY = CONFIG.camera.position.y; 
             camera = new BABYLON.UniversalCamera("Hero", CONFIG.camera.position, scene);
             
-            // PATCH: Directly establish Euler angles, ignoring quaternion completely
             camera.rotationQuaternion = null;                     
             camera.rotation.y = Math.atan2(90 - CONFIG.camera.position.x, 90 - CONFIG.camera.position.z);
             camera.rotation.x = 0;
@@ -190,7 +187,6 @@
             let exactYear = 2026; const yearsPerSecond = 10;
             
             engine.runRenderLoop(() => {
-                // PATCH: Use getDirection which reads the true view matrix safely
                 if (remoteInput.move.force > 0) {
                     const moveSpeed = remoteInput.move.force * 0.8;
                     const fwd   = camera.getDirection(BABYLON.Axis.Z);   
@@ -206,7 +202,7 @@
                     camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x));
                 }
 
-                camera.position.y = initialY; // Locks altitude
+                camera.position.y = initialY; 
                 
                 let horizontalDist = Math.sqrt(camera.position.x * camera.position.x + camera.position.z * camera.position.z);
                 if (horizontalDist > CONFIG.camera.radiusLimit) { let angle = Math.atan2(camera.position.z, camera.position.x); camera.position.x = Math.cos(angle) * CONFIG.camera.radiusLimit; camera.position.z = Math.sin(angle) * CONFIG.camera.radiusLimit; }
