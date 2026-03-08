@@ -92,7 +92,19 @@
         }
 
         function initRemoteSystem() {
-            const peer = new Peer();
+            // TURN SERVER ADDED: Forces connection through school firewalls
+            const peer = new Peer({
+                config: {
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun1.l.google.com:19302' },
+                        { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+                        { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+                        { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+                    ]
+                }
+            });
+            
             document.getElementById('pairing-overlay').style.display = 'flex';
             peer.on('open', (id) => {
                 new QRCode(document.getElementById("qrcode"), { 
@@ -100,8 +112,10 @@
                     width: 200, height: 200, colorDark: "#000000", colorLight: "#ffffff" 
                 });
             });
+            
             peer.on('connection', (conn) => {
                 document.getElementById('pairing-overlay').style.display = 'none';
+                
                 conn.on('data', (raw) => {
                     let data;
                     try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
@@ -149,7 +163,7 @@
             initialY = CONFIG.camera.position.y; 
             camera = new BABYLON.UniversalCamera("Hero", CONFIG.camera.position, scene);
             
-            // THE FIX: Directly establish Euler angles, ignoring quaternion completely
+            // PATCH: Directly establish Euler angles, ignoring quaternion completely
             camera.rotationQuaternion = null;                     
             camera.rotation.y = Math.atan2(90 - CONFIG.camera.position.x, 90 - CONFIG.camera.position.z);
             camera.rotation.x = 0;
@@ -176,20 +190,19 @@
             let exactYear = 2026; const yearsPerSecond = 10;
             
             engine.runRenderLoop(() => {
-                // THE FIX: Use getDirection which reads the true view matrix safely
+                // PATCH: Use getDirection which reads the true view matrix safely
                 if (remoteInput.move.force > 0) {
                     const moveSpeed = remoteInput.move.force * 0.8;
-                    const fwd   = camera.getDirection(BABYLON.Axis.Z);
-                    const right = camera.getDirection(BABYLON.Axis.X);
+                    const fwd   = camera.getDirection(BABYLON.Axis.Z);   
+                    const right = camera.getDirection(BABYLON.Axis.X);   
 
-                    camera.position.x += (fwd.x * remoteInput.move.y + right.x * remoteInput.move.x) * moveSpeed;
-                    camera.position.z += (fwd.z * remoteInput.move.y + right.z * remoteInput.move.x) * moveSpeed;
+                    camera.position.x += (fwd.x * remoteInput.move.y  + right.x * remoteInput.move.x) * moveSpeed;
+                    camera.position.z += (fwd.z * remoteInput.move.y  + right.z * remoteInput.move.x) * moveSpeed;
                 }
                 
                 if (remoteInput.rotate.force > 0) {
                     camera.rotation.y += remoteInput.rotate.x * 0.03 * remoteInput.rotate.force;
                     camera.rotation.x -= remoteInput.rotate.y * 0.03 * remoteInput.rotate.force;
-                    // Prevents flipping upside down
                     camera.rotation.x = Math.max(-1.2, Math.min(1.2, camera.rotation.x));
                 }
 
