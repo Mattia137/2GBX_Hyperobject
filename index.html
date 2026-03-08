@@ -71,7 +71,7 @@
         const iframe = document.getElementById('project-iframe');
         const loadFill = document.getElementById('loading-bar-fill');
         
-        let scene, camera, initialY;
+        let engine, scene, camera, initialY;
         let remoteInput = { move: {x:0, y:0, force:0}, rotate: {x:0, y:0, force:0} };
         
         const CONFIG = {
@@ -134,7 +134,7 @@
 
                     // Relay to iframe if sub-project is open
                     if (container.style.display !== 'none' && iframe.contentWindow) {
-                        if (data.type === 'MOVE' || data.type === 'ROTATE') {
+                        if (data.type === 'MOVE' || data.type === 'ROTATE' || data.type === 'SLIDE') {
                             iframe.contentWindow.postMessage({ source: 'hyperobject-remote', ...data }, '*');
                         }
                     }
@@ -177,7 +177,7 @@
         BABYLON.Effect.ShadersStore["starSkyboxVertexShader"] = `precision highp float; attribute vec3 position; uniform mat4 worldViewProjection; varying vec3 vPosition; void main(void) { gl_Position = worldViewProjection * vec4(position, 1.0); vPosition = position; }`;
 
         async function startScene() {
-            const engine = new BABYLON.Engine(canvas, true); scene = new BABYLON.Scene(engine); scene.clearColor = new BABYLON.Color4(0,0,0,1);
+            engine = new BABYLON.Engine(canvas, true); scene = new BABYLON.Scene(engine); scene.clearColor = new BABYLON.Color4(0,0,0,1);
             const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", {size: 5000.0}, scene);
             const skyboxMaterial = new BABYLON.ShaderMaterial("starSky", scene, { vertex: "starSkybox", fragment: "starSkybox", }, { attributes: ["position"], uniforms: ["worldViewProjection"] });
             skyboxMaterial.backFaceCulling = false; skybox.infiniteDistance = true; skybox.material = skyboxMaterial;
