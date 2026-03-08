@@ -281,6 +281,7 @@
                     if (m.name === "MASS_WIRE") m.setEnabled(true);
                 });
             };
+            window.updateVisibility = updateVisibility;
 
             document.getElementById('btn-mass').onclick = () => updateVisibility(false);
             document.getElementById('btn-program').onclick = () => updateVisibility(true);
@@ -314,6 +315,9 @@
                 camera.radius = Math.max(camera.lowerRadiusLimit || 5,
                     Math.min(camera.upperRadiusLimit || 500,
                     camera.radius - d.y * d.force * 2.0));
+            }
+            if (d.type === 'MODE' && window.updateVisibility) {
+                window.updateVisibility(d.mode === 'program');
             }
         });
     </script>
