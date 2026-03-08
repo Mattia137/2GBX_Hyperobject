@@ -296,6 +296,18 @@
                     slider.dispatchEvent(new Event('input'));
                 }
             }
+            if (d.type === 'NAV') {
+                // Simulate clicking the corresponding nav button
+                const navButtons = document.querySelectorAll('.nav-btn');
+                if (d.navId) {
+                    const targetBtn = document.querySelector(`.nav-btn[data-id="${d.navId}"]`);
+                    if (targetBtn) targetBtn.click();
+                } else {
+                    // null navId = deselect all (toggle off)
+                    const activeBtn = document.querySelector('.nav-btn.active');
+                    if (activeBtn) activeBtn.click();
+                }
+            }
         });
     </script>
 </body>
