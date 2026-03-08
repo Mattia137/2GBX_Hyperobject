@@ -74,10 +74,17 @@
         let engine, scene, camera, initialY;
         let remoteInput = { move: {x:0, y:0, force:0}, rotate: {x:0, y:0, force:0} };
         let _projectOpen = false;
+        let _lastPickedProject = null;  // cached from render loop
+        let _lastPingTime = 0;
+        let _heartbeatInterval = null;
         
         function isProjectOpen() { return _projectOpen; }
 
         function resetToModeSelection() {
+            // Clear heartbeat monitor
+            if (_heartbeatInterval) { clearInterval(_heartbeatInterval); _heartbeatInterval = null; }
+            _lastPingTime = 0;
+            _lastPickedProject = null;
             // Close any open project
             if (_projectOpen) {
                 container.style.display = 'none';
@@ -149,6 +156,15 @@
                 }
                 document.getElementById('pairing-overlay').style.display = 'none';
                 
+                // Start heartbeat monitor — if no ping for 5s, connection is lost
+                _lastPingTime = Date.now();
+                if (_heartbeatInterval) clearInterval(_heartbeatInterval);
+                _heartbeatInterval = setInterval(() => {
+                    if (_lastPingTime > 0 && (Date.now() - _lastPingTime) > 5000) {
+                        resetToModeSelection();
+                    }
+                }, 2000);
+                
                 // Handle connection lost → back to mode selection
                 conn.on('close', () => { resetToModeSelection(); });
                 conn.on('error', () => { resetToModeSelection(); });
@@ -156,6 +172,9 @@
                 conn.on('data', (raw) => {
                     let data;
                     try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
+
+                    // Track heartbeat pings
+                    if (data.type === 'PING') { _lastPingTime = Date.now(); return; }
 
                     if(data.force > 0) {
                         targetDisplay.innerText = `RCVD_${data.type}`;
@@ -186,14 +205,8 @@
                         if (data.action === 'ACTION') {
                             if (isProjectOpen()) {
                                 iframe.contentWindow.postMessage({ source: 'hyperobject-remote', type: 'CLICK' }, '*');
-                            } else {
-                                const cx = engine.getRenderWidth() / 2;
-                                const cy = engine.getRenderHeight() / 2;
-                                const pick = scene.pick(cx, cy);
-                                if (pick.hit && pick.pickedMesh) {
-                                    const name = pick.pickedMesh.name.toLowerCase();
-                                    if (CONFIG.nav.projects[name]) openProject(CONFIG.nav.projects[name]);
-                                }
+                            } else if (_lastPickedProject) {
+                                openProject(_lastPickedProject);
                             }
                         }
                     }
@@ -281,6 +294,7 @@
                     cursorRing.style.left = cx + 'px';
                     cursorRing.style.top  = cy + 'px';
                     const rp = scene.pick(cx, cy);
+                    _lastPickedProject = null;  // reset each frame
                     if (rp.hit && rp.pickedMesh) {
                         const rn = rp.pickedMesh.name;
                         const rl = rn.toLowerCase();
@@ -290,8 +304,12 @@
                             cursorRing.classList.remove('active-pulse');
                         } else {
                             targetDisplay.innerText = rn.toUpperCase(); targetDisplay.style.opacity = '1';
-                            if (CONFIG.nav.projects[rl]) cursorRing.classList.add('active-pulse');
-                            else cursorRing.classList.remove('active-pulse');
+                            if (CONFIG.nav.projects[rl]) {
+                                cursorRing.classList.add('active-pulse');
+                                _lastPickedProject = CONFIG.nav.projects[rl];
+                            } else {
+                                cursorRing.classList.remove('active-pulse');
+                            }
                         }
                     } else {
                         targetDisplay.innerText = '---'; targetDisplay.style.opacity = '0.3';
