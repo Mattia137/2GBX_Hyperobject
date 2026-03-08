@@ -209,6 +209,14 @@
                                 openProject(_lastPickedProject);
                             }
                         }
+                        // Relay NAV commands to assembly iframe
+                        if (data.action === 'NAV' && isProjectOpen() && iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({ source: 'hyperobject-remote', type: 'NAV', navId: data.navId }, '*');
+                        }
+                        // Relay MODE commands to diagnostic iframe
+                        if (data.action === 'MODE' && isProjectOpen() && iframe.contentWindow) {
+                            iframe.contentWindow.postMessage({ source: 'hyperobject-remote', type: 'MODE', mode: data.mode }, '*');
+                        }
                     }
                 });
             });
