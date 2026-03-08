@@ -74,7 +74,7 @@
         let scene, camera, initialY;
         let remoteInput = { move: {x:0, y:0, force:0}, rotate: {x:0, y:0, force:0} };
         
-        // SYSTEM PARAMETERS
+        // PARAMETER BLOCK
         const CONFIG = {
             camera: { fov: 1.3, position: new BABYLON.Vector3(0, 15, 0), speed: 1.0, radiusLimit: 130 },
             sun: { rotation: 300, elevation: 25, intensity: 60.0 },
@@ -104,11 +104,16 @@
             peer.on('connection', (conn) => {
                 document.getElementById('pairing-overlay').style.display = 'none';
                 conn.on('data', (data) => {
-                    if (data.type === 'MOVE') { remoteInput.move = { x: data.x, y: data.y, force: data.force }; }
-                    if (data.type === 'ROTATE') { remoteInput.rotate = { x: data.x, y: data.y, force: data.force }; }
+                    // Safe typecasting to guarantee data streams flawlessly into the render loop
+                    if (data.type === 'MOVE') { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
+                    if (data.type === 'ROTATE') { remoteInput.rotate = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     if (data.type === 'SLIDE') { if(window.updateExplosion) updateExplosion(data.value); }
                     if (data.type === 'BUTTON') {
-                        if (data.action === 'RESET') { camera.position.copyFrom(CONFIG.camera.position); camera.setTarget(new BABYLON.Vector3(90, 0, 90)); }
+                        if (data.action === 'RESET') { 
+                            camera.position.copyFrom(CONFIG.camera.position); 
+                            camera.setTarget(new BABYLON.Vector3(90, 0, 90)); 
+                            camera.rotationQuaternion = null; 
+                        }
                         if (data.action === 'ACTION') openProject('diagnostic_ui.html');
                     }
                 });
@@ -129,8 +134,15 @@
             skyboxMaterial.backFaceCulling = false; skybox.infiniteDistance = true; skybox.material = skyboxMaterial;
             scene.environmentTexture = BABYLON.CubeTexture.CreateFromPrefilteredData(CONFIG.environment.textureUrl, scene);
             scene.environmentIntensity = CONFIG.environment.intensity;
-            initialY = CONFIG.camera.position.y; camera = new BABYLON.UniversalCamera("Hero", CONFIG.camera.position, scene);
-            camera.setTarget(new BABYLON.Vector3(90, 0, 90)); camera.fov = CONFIG.camera.fov;
+            
+            initialY = CONFIG.camera.position.y; 
+            camera = new BABYLON.UniversalCamera("Hero", CONFIG.camera.position, scene);
+            camera.setTarget(new BABYLON.Vector3(90, 0, 90)); 
+            
+            // THE FIX: Unlocks the internal rotation matrix after setting the initial target
+            camera.rotationQuaternion = null; 
+            
+            camera.fov = CONFIG.camera.fov;
             const hRad = BABYLON.Tools.ToRadians(CONFIG.sun.rotation); const vRad = BABYLON.Tools.ToRadians(CONFIG.sun.elevation);
             const sunDir = new BABYLON.Vector3(Math.cos(vRad) * Math.sin(hRad), -Math.sin(vRad), Math.cos(vRad) * Math.cos(hRad));
             const sun = new BABYLON.DirectionalLight("sun", sunDir, scene); sun.intensity = CONFIG.sun.intensity;
@@ -149,24 +161,39 @@
             scene.onPointerDown = () => { const pickResult = scene.pick(scene.pointerX, scene.pointerY); if (pickResult.hit && pickResult.pickedMesh) { const name = pickResult.pickedMesh.name.toLowerCase(); if (CONFIG.nav.projects[name]) { openProject(CONFIG.nav.projects[name]); } } };
 
             let exactYear = 2026; const yearsPerSecond = 10;
+            
             engine.runRenderLoop(() => {
+                // THE FIX: Raw trigonometric movement bypasses any internal camera axis errors
                 if (remoteInput.move.force > 0) {
-                    camera.position.addInPlace(camera.getDirection(BABYLON.Axis.Z).scale(remoteInput.move.y * remoteInput.move.force * 0.8));
-                    camera.position.addInPlace(camera.getDirection(BABYLON.Axis.X).scale(remoteInput.move.x * remoteInput.move.force * 0.8));
+                    let moveSpeed = remoteInput.move.force * 0.8;
+                    let rotY = camera.rotation.y;
+                    
+                    // Manually calculate where "Forward" and "Right" are based on where the camera is looking
+                    let forwardX = Math.sin(rotY);
+                    let forwardZ = Math.cos(rotY);
+                    let rightX = Math.sin(rotY + Math.PI/2);
+                    let rightZ = Math.cos(rotY + Math.PI/2);
+
+                    camera.position.x += (forwardX * remoteInput.move.y + rightX * remoteInput.move.x) * moveSpeed;
+                    camera.position.z += (forwardZ * remoteInput.move.y + rightZ * remoteInput.move.x) * moveSpeed;
                 }
+                
                 if (remoteInput.rotate.force > 0) {
                     camera.rotation.y += remoteInput.rotate.x * 0.03 * remoteInput.rotate.force;
                     camera.rotation.x -= remoteInput.rotate.y * 0.03 * remoteInput.rotate.force;
                 }
 
-                camera.position.y = initialY;
+                camera.position.y = initialY; // Locks altitude
+                
                 let horizontalDist = Math.sqrt(camera.position.x * camera.position.x + camera.position.z * camera.position.z);
                 if (horizontalDist > CONFIG.camera.radiusLimit) { let angle = Math.atan2(camera.position.z, camera.position.x); camera.position.x = Math.cos(angle) * CONFIG.camera.radiusLimit; camera.position.z = Math.sin(angle) * CONFIG.camera.radiusLimit; }
                 skybox.position = camera.position;
+                
                 const deltaSeconds = engine.getDeltaTime() / 1000; exactYear += yearsPerSecond * deltaSeconds; yearDisplay.innerText = Math.floor(exactYear);
                 const sunPos = sunDir.scale(-100); const proj = BABYLON.Vector3.Project(sunPos, BABYLON.Matrix.Identity(), scene.getTransformMatrix(), camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()));
                 if (proj.z > 0 && proj.z < 1) { document.getElementById("streak").setAttribute("cx", proj.x); document.getElementById("streak").setAttribute("cy", proj.y); document.getElementById("flare-svg").style.opacity = 1; } else { document.getElementById("flare-svg").style.opacity = 0; }
                 document.getElementById("coord-val").innerText = `${camera.position.x.toFixed(2)} // ${camera.position.z.toFixed(2)}`;
+                
                 scene.render();
             });
             window.addEventListener("resize", () => engine.resize());
