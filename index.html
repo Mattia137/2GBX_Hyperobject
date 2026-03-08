@@ -92,6 +92,8 @@
         }
 
         function initRemoteSystem() {
+            cursorRing.style.opacity = '1';
+            window._remoteActive = true;
             const peer = new Peer({
                 config: {
                     'iceServers': [
@@ -226,6 +228,30 @@
                 if (proj.z > 0 && proj.z < 1) { document.getElementById("streak").setAttribute("cx", proj.x); document.getElementById("streak").setAttribute("cy", proj.y); document.getElementById("flare-svg").style.opacity = 1; } else { document.getElementById("flare-svg").style.opacity = 0; }
                 document.getElementById("coord-val").innerText = `${camera.position.x.toFixed(2)} // ${camera.position.z.toFixed(2)}`;
                 
+                // Remote mode: raycast at screen center to update HUD + cursor ring
+                if (remoteInput.move.force > 0 || remoteInput.rotate.force > 0 || window._remoteActive) {
+                    window._remoteActive = true;
+                    const cx = engine.getRenderWidth() / 2;
+                    const cy = engine.getRenderHeight() / 2;
+                    cursorRing.style.left = cx + 'px';
+                    cursorRing.style.top  = cy + 'px';
+                    const rPick = scene.pick(cx, cy);
+                    if (rPick.hit && rPick.pickedMesh) {
+                        const rNameRaw = rPick.pickedMesh.name;
+                        const rName = rNameRaw.toLowerCase();
+                        if (rName.includes('skybox') || rName.includes('terrain') || rName.includes('ground') || rName.includes('background')) {
+                            targetDisplay.innerText = '---'; targetDisplay.style.opacity = '0.3';
+                            cursorRing.classList.remove('active-pulse');
+                        } else {
+                            targetDisplay.innerText = rNameRaw.toUpperCase(); targetDisplay.style.opacity = '1';
+                            if (CONFIG.nav.projects[rName]) { cursorRing.classList.add('active-pulse'); }
+                            else { cursorRing.classList.remove('active-pulse'); }
+                        }
+                    } else {
+                        targetDisplay.innerText = '---'; targetDisplay.style.opacity = '0.3';
+                        cursorRing.classList.remove('active-pulse');
+                    }
+                }
                 scene.render();
             });
             window.addEventListener("resize", () => engine.resize());
