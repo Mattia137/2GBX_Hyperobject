@@ -124,7 +124,7 @@
                     let data;
                     try { data = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch(e) { return; }
 
-                    if (data.type === 'MOVE' { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
+                    if (data.type === 'MOVE') { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     if (data.type === 'ROTATE') { remoteInput.rotate = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     // If a sub-project iframe is open, relay move/rotate for orbit
                     const projectOpen = container.style.display !== 'none';
