@@ -140,13 +140,14 @@
             cursor.style.left = e.clientX + 'px'; cursor.style.top = e.clientY + 'px';
         });
 
+        let camera; // hoisted for remote message listener
         const init = () => {
             const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
             const scene = new BABYLON.Scene(engine);
             scene.clearColor = new BABYLON.Color4(1, 1, 1, 1);
 
             const pivotTarget = new BABYLON.Vector3(PARAMS.camera.pivotX, PARAMS.camera.pivotY, PARAMS.camera.pivotZ);
-            const camera = new BABYLON.ArcRotateCamera("camera", PARAMS.camera.alpha, PARAMS.camera.beta, PARAMS.camera.radius, pivotTarget, scene);
+            camera = new BABYLON.ArcRotateCamera("camera", PARAMS.camera.alpha, PARAMS.camera.beta, PARAMS.camera.radius, pivotTarget, scene);
             camera.attachControl(canvas, true);
             camera.inputs.attached.pointers.buttons = [0]; 
             camera.panningSensibility = 0; 
@@ -269,6 +270,33 @@
         };
 
         init();
+
+        // ── REMOTE CONTROL LISTENER ──────────────────────────────
+        // Receives postMessage from parent index.html when in remote mode
+        window.addEventListener('message', (e) => {
+            if (!e.data || e.data.source !== 'hyperobject-remote') return;
+            const d = e.data;
+
+            if (d.type === 'MOVE' && camera) {
+                // Orbit: left stick x = rotate alpha, y = change beta (vertical)
+                camera.alpha -= d.x * d.force * 0.04;
+                camera.beta  += d.y * d.force * 0.04;
+                camera.beta   = Math.max(0.1, Math.min(Math.PI - 0.1, camera.beta));
+            }
+            if (d.type === 'ROTATE' && camera) {
+                // Right stick / gyro: zoom in/out with y axis
+                camera.radius = Math.max(camera.lowerRadiusLimit || 5,
+                    Math.min(camera.upperRadiusLimit || 200,
+                    camera.radius - d.y * d.force * 1.5));
+            }
+            if (d.type === 'SLIDE') {
+                const slider = document.getElementById('animSlider');
+                if (slider) {
+                    slider.value = Math.round(d.value * 100);
+                    slider.dispatchEvent(new Event('input'));
+                }
+            }
+        });
     </script>
 </body>
 </html>
