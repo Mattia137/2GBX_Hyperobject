@@ -93,7 +93,7 @@
 
         function initRemoteSystem() {
             cursorRing.style.opacity = '1';
-            window._remoteActive = true;
+            window._remoteMode = true;
             const peer = new Peer({
                 config: {
                     'iceServers': [
@@ -134,10 +134,19 @@
 
                     if (data.type === 'MOVE') { remoteInput.move = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
                     if (data.type === 'ROTATE') { remoteInput.rotate = { x: Number(data.x)||0, y: Number(data.y)||0, force: Number(data.force)||0 }; }
+                    // If a sub-project iframe is open, relay move/rotate for orbit
+                    const projectOpen = container.style.display !== 'none';
+                    if (projectOpen && iframe.contentWindow) {
+                        if (data.type === 'MOVE' || data.type === 'ROTATE') {
+                            iframe.contentWindow.postMessage({ source: 'hyperobject-remote', ...data }, '*');
+                        }
+                    }
+
                     if (data.type === 'SLIDE') { if(window.updateExplosion) updateExplosion(data.value); }
                     if (data.type === 'BUTTON') {
-                        if (data.action === 'RESET') { 
-                            camera.position.copyFrom(CONFIG.camera.position); 
+                        if (data.action === 'RESET') {
+                            // Reset both position AND rotation to initial state
+                            camera.position.copyFrom(CONFIG.camera.position);
                             camera.rotationQuaternion = null;
                             camera.rotation.y = Math.atan2(90 - CONFIG.camera.position.x, 90 - CONFIG.camera.position.z);
                             camera.rotation.x = 0;
@@ -145,12 +154,18 @@
                         }
                         if (data.action === 'BACK') { closeProject(); }
                         if (data.action === 'ACTION') {
-                            const cx = engine.getRenderWidth() / 2;
-                            const cy = engine.getRenderHeight() / 2;
-                            const pick = scene.pick(cx, cy);
-                            if (pick.hit && pick.pickedMesh) {
-                                const name = pick.pickedMesh.name.toLowerCase();
-                                if (CONFIG.nav.projects[name]) openProject(CONFIG.nav.projects[name]);
+                            if (projectOpen) {
+                                // Inside a project: relay click to iframe
+                                iframe.contentWindow.postMessage({ source: 'hyperobject-remote', type: 'CLICK' }, '*');
+                            } else {
+                                // In main world: raycast at screen center crosshair
+                                const cx = engine.getRenderWidth() / 2;
+                                const cy = engine.getRenderHeight() / 2;
+                                const pick = scene.pick(cx, cy);
+                                if (pick.hit && pick.pickedMesh) {
+                                    const name = pick.pickedMesh.name.toLowerCase();
+                                    if (CONFIG.nav.projects[name]) openProject(CONFIG.nav.projects[name]);
+                                }
                             }
                         }
                     }
@@ -228,24 +243,23 @@
                 if (proj.z > 0 && proj.z < 1) { document.getElementById("streak").setAttribute("cx", proj.x); document.getElementById("streak").setAttribute("cy", proj.y); document.getElementById("flare-svg").style.opacity = 1; } else { document.getElementById("flare-svg").style.opacity = 0; }
                 document.getElementById("coord-val").innerText = `${camera.position.x.toFixed(2)} // ${camera.position.z.toFixed(2)}`;
                 
-                // Remote mode: raycast at screen center to update HUD + cursor ring
-                if (remoteInput.move.force > 0 || remoteInput.rotate.force > 0 || window._remoteActive) {
-                    window._remoteActive = true;
+                // Remote: raycast screen center to update HUD target display
+                if (window._remoteMode && container.style.display === 'none') {
                     const cx = engine.getRenderWidth() / 2;
                     const cy = engine.getRenderHeight() / 2;
                     cursorRing.style.left = cx + 'px';
                     cursorRing.style.top  = cy + 'px';
-                    const rPick = scene.pick(cx, cy);
-                    if (rPick.hit && rPick.pickedMesh) {
-                        const rNameRaw = rPick.pickedMesh.name;
-                        const rName = rNameRaw.toLowerCase();
-                        if (rName.includes('skybox') || rName.includes('terrain') || rName.includes('ground') || rName.includes('background')) {
+                    const rp = scene.pick(cx, cy);
+                    if (rp.hit && rp.pickedMesh) {
+                        const rn = rp.pickedMesh.name;
+                        const rl = rn.toLowerCase();
+                        if (rl.includes('skybox')||rl.includes('terrain')||rl.includes('ground')||rl.includes('background')) {
                             targetDisplay.innerText = '---'; targetDisplay.style.opacity = '0.3';
                             cursorRing.classList.remove('active-pulse');
                         } else {
-                            targetDisplay.innerText = rNameRaw.toUpperCase(); targetDisplay.style.opacity = '1';
-                            if (CONFIG.nav.projects[rName]) { cursorRing.classList.add('active-pulse'); }
-                            else { cursorRing.classList.remove('active-pulse'); }
+                            targetDisplay.innerText = rn.toUpperCase(); targetDisplay.style.opacity = '1';
+                            if (CONFIG.nav.projects[rl]) cursorRing.classList.add('active-pulse');
+                            else cursorRing.classList.remove('active-pulse');
                         }
                     } else {
                         targetDisplay.innerText = '---'; targetDisplay.style.opacity = '0.3';
