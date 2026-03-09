@@ -160,10 +160,10 @@
                 _lastPingTime = Date.now();
                 if (_heartbeatInterval) clearInterval(_heartbeatInterval);
                 _heartbeatInterval = setInterval(() => {
-                    if (_lastPingTime > 0 && (Date.now() - _lastPingTime) > 5000) {
+                    if (_lastPingTime > 0 && (Date.now() - _lastPingTime) > 20000) {
                         resetToModeSelection();
                     }
-                }, 2000);
+                }, 5000);
                 
                 // Handle connection lost → back to mode selection
                 conn.on('close', () => { resetToModeSelection(); });
@@ -221,9 +221,29 @@
                 });
             });
             
-            // If the PeerJS connection is destroyed/disconnected entirely
-            peer.on('disconnected', () => { resetToModeSelection(); });
-            peer.on('error', () => { resetToModeSelection(); });
+            // If PeerJS loses connection to signaling server, try to reconnect
+            // (common on slow hotspots) before falling back to mode selection
+            peer.on('disconnected', () => {
+                // Give it up to 15s to reconnect before giving up
+                const reconnectTimeout = setTimeout(() => {
+                    if (peer.disconnected) resetToModeSelection();
+                }, 15000);
+                try {
+                    peer.reconnect();
+                    peer.once('open', () => clearTimeout(reconnectTimeout));
+                } catch(e) {
+                    clearTimeout(reconnectTimeout);
+                    resetToModeSelection();
+                }
+            });
+            peer.on('error', (err) => {
+                // Ignore non-fatal errors (e.g. slow ICE, STUN timeouts on hotspot)
+                if (err.type === 'network' || err.type === 'disconnected' || err.type === 'server-error') {
+                    console.warn('PeerJS non-fatal error, staying connected:', err.type);
+                    return;
+                }
+                resetToModeSelection();
+            });
         }
 
         function openProject(url) { _projectOpen = true; overlay.style.opacity = '1'; overlay.style.pointerEvents = 'all'; setTimeout(() => { iframe.src = url; container.style.display = 'block'; setTimeout(() => { overlay.style.opacity = '0'; overlay.style.pointerEvents = 'none'; }, 600); }, CONFIG.nav.transitionSpeed); }
